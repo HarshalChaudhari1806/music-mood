@@ -1,0 +1,32 @@
+# Ignore virtual environment
+.venv/
+venv/
+env/
+
+# Ignore Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Ignore development files
+.git/
+.gitignore
+README.md
+.DS_Store
+.vscode/
+
+# Ignore logs
+*.log
+logs/
+
+# Ignore temporary files
+*.tmp
+*.temp
+.env
+
+# Ignore music files (too large for container)
+music/*.mp3
+music/*.wav
+music/*.m4a

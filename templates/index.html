@@ -1,0 +1,892 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Music Mood Player</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: white;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .header p {
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+
+        .main-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+
+        .card {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .card h2 {
+            font-size: 1.5em;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .mood-section {
+            text-align: center;
+        }
+
+        .mood-display {
+            font-size: 3em;
+            margin: 20px 0;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 50%;
+            width: 120px;
+            height: 120px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 20px auto;
+            transition: all 0.3s ease;
+        }
+
+        .mood-display.happy { background: rgba(255, 193, 7, 0.3); }
+        .mood-display.sad { background: rgba(33, 150, 243, 0.3); }
+        .mood-display.angry { background: rgba(244, 67, 54, 0.3); }
+        .mood-display.neutral { background: rgba(158, 158, 158, 0.3); }
+        .mood-display.fear { background: rgba(156, 39, 176, 0.3); }
+        .mood-display.surprise { background: rgba(255, 152, 0, 0.3); }
+        .mood-display.disgust { background: rgba(76, 175, 80, 0.3); }
+
+        .mood-info {
+            margin-top: 15px;
+            font-size: 1.1em;
+        }
+
+        .confidence-bar {
+            width: 100%;
+            height: 10px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 5px;
+            margin-top: 10px;
+            overflow: hidden;
+        }
+
+        .confidence-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #ff6b6b, #4ecdc4, #45b7d1);
+            border-radius: 5px;
+            transition: width 0.3s ease;
+            width: 0%;
+        }
+
+        .controls {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .btn {
+            background: rgba(255, 255, 255, 0.2);
+            border: none;
+            color: white;
+            padding: 12px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1em;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateY(-2px);
+        }
+
+        .btn.active {
+            background: rgba(76, 175, 80, 0.6);
+        }
+
+        .btn.danger {
+            background: rgba(244, 67, 54, 0.6);
+        }
+
+        .music-controls {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            flex-wrap: wrap;
+            margin-top: 20px;
+        }
+
+        .music-controls .btn {
+            min-width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            font-size: 1.2em;
+        }
+
+        .volume-control {
+            margin-top: 20px;
+        }
+
+        .volume-slider {
+            width: 100%;
+            height: 8px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 4px;
+            outline: none;
+            -webkit-appearance: none;
+            margin-top: 10px;
+        }
+
+        .volume-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 20px;
+            height: 20px;
+            background: white;
+            border-radius: 50%;
+            cursor: pointer;
+        }
+
+        .current-song {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 20px;
+            text-align: center;
+        }
+
+        .song-title {
+            font-size: 1.2em;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .song-artist {
+            opacity: 0.8;
+        }
+
+        .mood-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .mood-btn {
+            padding: 15px;
+            text-align: center;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: rgba(255, 255, 255, 0.1);
+            border: 2px solid transparent;
+        }
+
+        .mood-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+            border-color: rgba(255, 255, 255, 0.3);
+        }
+
+        .mood-btn.active {
+            border-color: white;
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .status-indicators {
+            display: flex;
+            justify-content: space-around;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .status-item {
+            text-align: center;
+            padding: 10px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            min-width: 100px;
+        }
+
+        .status-value {
+            font-size: 1.5em;
+            font-weight: bold;
+            display: block;
+        }
+
+        .status-label {
+            font-size: 0.9em;
+            opacity: 0.8;
+        }
+
+        .library-stats {
+            grid-column: 1 / -1;
+        }
+
+        @media (max-width: 768px) {
+            .main-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .header h1 {
+                font-size: 2em;
+            }
+            
+            .controls {
+                grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+            }
+        }
+
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255,255,255,.3);
+            border-radius: 50%;
+            border-top-color: #fff;
+            animation: spin 1s ease-in-out infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 15px 20px;
+            border-radius: 8px;
+            z-index: 1000;
+            transform: translateX(400px);
+            transition: transform 0.3s ease;
+        }
+
+        .notification.show {
+            transform: translateX(0);
+        }
+
+        .pulse {
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <h1><i class="fas fa-music"></i> Music Mood Player</h1>
+            <p>AI-powered mood detection and music recommendation system</p>
+        </header>
+
+        <div class="main-grid">
+            <!-- Mood Detection Section -->
+            <div class="card mood-section">
+                <h2><i class="fas fa-smile"></i> Mood Detection</h2>
+                
+                <div class="mood-display" id="moodDisplay">
+                    😐
+                </div>
+                
+                <div class="mood-info">
+                    <div><strong>Current Mood:</strong> <span id="currentMood">neutral</span></div>
+                    <div><strong>Confidence:</strong> <span id="moodConfidence">0%</span></div>
+                    <div class="confidence-bar">
+                        <div class="confidence-fill" id="confidenceFill"></div>
+                    </div>
+                </div>
+
+                <div class="controls">
+                    <button class="btn" id="startDetectionBtn" onclick="startDetection()">
+                        <i class="fas fa-video"></i> Start Camera
+                    </button>
+                    <button class="btn danger" id="stopDetectionBtn" onclick="stopDetection()">
+                        <i class="fas fa-video-slash"></i> Stop Camera
+                    </button>
+                    <button class="btn" id="autoPlayBtn" onclick="toggleAutoPlay()">
+                        <i class="fas fa-magic"></i> Auto Play: ON
+                    </button>
+                </div>
+            </div>
+
+            <!-- Music Player Section -->
+            <div class="card">
+                <h2><i class="fas fa-play"></i> Music Player</h2>
+                
+                <div class="current-song" id="currentSong">
+                    <div class="song-title">No song playing</div>
+                    <div class="song-artist">Select a mood or start detection</div>
+                </div>
+
+                <div class="music-controls">
+                    <button class="btn" onclick="musicControl('previous')">
+                        <i class="fas fa-step-backward"></i>
+                    </button>
+                    <button class="btn" id="playPauseBtn" onclick="togglePlayPause()">
+                        <i class="fas fa-play"></i>
+                    </button>
+                    <button class="btn" onclick="musicControl('next')">
+                        <i class="fas fa-step-forward"></i>
+                    </button>
+                    <button class="btn" onclick="musicControl('shuffle')" id="shuffleBtn">
+                        <i class="fas fa-random"></i>
+                    </button>
+                    <button class="btn" onclick="musicControl('repeat')" id="repeatBtn">
+                        <i class="fas fa-redo"></i>
+                    </button>
+                </div>
+
+                <div class="volume-control">
+                    <label><i class="fas fa-volume-up"></i> Volume</label>
+                    <input type="range" class="volume-slider" id="volumeSlider" 
+                           min="0" max="100" value="70" onchange="setVolume(this.value)">
+                </div>
+            </div>
+
+            <!-- Manual Mood Selection -->
+            <div class="card">
+                <h2><i class="fas fa-list"></i> Manual Mood Selection</h2>
+                
+                <div class="mood-grid">
+                    <div class="mood-btn" onclick="playMoodMusic('happy')">
+                        <div style="font-size: 2em;">😊</div>
+                        <div>Happy</div>
+                    </div>
+                    <div class="mood-btn" onclick="playMoodMusic('sad')">
+                        <div style="font-size: 2em;">😢</div>
+                        <div>Sad</div>
+                    </div>
+                    <div class="mood-btn" onclick="playMoodMusic('angry')">
+                        <div style="font-size: 2em;">😠</div>
+                        <div>Angry</div>
+                    </div>
+                    <div class="mood-btn" onclick="playMoodMusic('neutral')">
+                        <div style="font-size: 2em;">😐</div>
+                        <div>Neutral</div>
+                    </div>
+                    <div class="mood-btn" onclick="playMoodMusic('fear')">
+                        <div style="font-size: 2em;">😨</div>
+                        <div>Fear</div>
+                    </div>
+                    <div class="mood-btn" onclick="playMoodMusic('surprise')">
+                        <div style="font-size: 2em;">😲</div>
+                        <div>Surprise</div>
+                    </div>
+                    <div class="mood-btn" onclick="playMoodMusic('disgust')">
+                        <div style="font-size: 2em;">🤢</div>
+                        <div>Disgust</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Statistics Section -->
+            <div class="card">
+                <h2><i class="fas fa-chart-bar"></i> Statistics</h2>
+                
+                <div class="status-indicators">
+                    <div class="status-item">
+                        <span class="status-value" id="detectionStatus">Inactive</span>
+                        <span class="status-label">Detection</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="status-value" id="songsCount">0</span>
+                        <span class="status-label">Total Songs</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="status-value" id="currentMoodSongs">0</span>
+                        <span class="status-label">Current Mood</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Library Management -->
+            <div class="card library-stats">
+                <h2><i class="fas fa-folder-open"></i> Music Library</h2>
+                
+                <div class="mood-grid" id="libraryStats">
+                    <!-- Will be populated by JavaScript -->
+                </div>
+
+                <div class="controls" style="margin-top: 20px;">
+                    <button class="btn" onclick="refreshLibrary()">
+                        <i class="fas fa-sync-alt"></i> Refresh Library
+                    </button>
+                    <button class="btn" onclick="trainClassifier()">
+                        <i class="fas fa-brain"></i> Train AI
+                    </button>
+                </div>
+            </div>
+
+            <!-- Enhanced Mood Detection Settings -->
+            <div class="card">
+                <h2><i class="fas fa-cogs"></i> Detection Settings</h2>
+                
+                <div style="margin-bottom: 15px;">
+                    <label><i class="fas fa-gauge"></i> Sensitivity</label>
+                    <input type="range" id="sensitivitySlider" min="0.1" max="0.8" step="0.05" value="0.25" 
+                           onchange="updateDetectionParams()" class="volume-slider">
+                    <span id="sensitivityValue">0.25</span>
+                </div>
+                
+                <div style="margin-bottom: 15px;">
+                    <label><i class="fas fa-wave-square"></i> Smoothing</label>
+                    <input type="range" id="smoothingSlider" min="0.3" max="0.9" step="0.05" value="0.7" 
+                           onchange="updateDetectionParams()" class="volume-slider">
+                    <span id="smoothingValue">0.70</span>
+                </div>
+                
+                <div style="margin-bottom: 15px;">
+                    <label><i class="fas fa-clock"></i> Response Time (sec)</label>
+                    <input type="range" id="responseSlider" min="5" max="20" step="1" value="8" 
+                           onchange="updateDetectionParams()" class="volume-slider">
+                    <span id="responseValue">8</span>
+                </div>
+                
+                <div style="margin-bottom: 15px;">
+                    <label><i class="fas fa-sad-tear"></i> Sad Detection Sensitivity</label>
+                    <input type="range" id="sadSensitivitySlider" min="0.5" max="3.0" step="0.1" value="1.2" 
+                           onchange="updateSadSensitivity()" class="volume-slider">
+                    <span id="sadSensitivityValue">1.2</span>
+                </div>
+                
+                <button class="btn" onclick="resetDetectionDefaults()">
+                    <i class="fas fa-undo"></i> Reset Defaults
+                </button>
+                
+                <button class="btn" onclick="showDebugInfo()" style="margin-left: 10px;">
+                    <i class="fas fa-bug"></i> Debug Info
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notification Container -->
+    <div id="notification" class="notification"></div>
+
+    <script>
+        // Global state
+        let isDetecting = false;
+        let autoPlayEnabled = true;
+        let currentPlaybackStatus = {};
+
+        // Mood emojis
+        const moodEmojis = {
+            'happy': '😊',
+            'sad': '😢', 
+            'angry': '😠',
+            'neutral': '😐',
+            'fear': '😨',
+            'surprise': '😲',
+            'disgust': '🤢'
+        };
+
+        // Initialize the application
+        document.addEventListener('DOMContentLoaded', function() {
+            updatePlaybackStatus();
+            updateLibraryStats();
+            setInterval(updateMoodDisplay, 1000);
+            setInterval(updatePlaybackStatus, 2000);
+        });
+
+        function startDetection() {
+            const btn = document.getElementById('startDetectionBtn');
+            btn.innerHTML = '<div class="loading"></div> Starting...';
+            btn.disabled = true;
+
+            fetch('/api/start_detection', { method: 'POST' })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        isDetecting = true;
+                        showNotification('Mood detection started!', 'success');
+                        document.getElementById('detectionStatus').textContent = 'Active';
+                    } else {
+                        showNotification('Failed to start detection: ' + data.message, 'error');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    showNotification('Error starting detection', 'error');
+                })
+                .finally(() => {
+                    btn.innerHTML = '<i class="fas fa-video"></i> Start Camera';
+                    btn.disabled = false;
+                });
+        }
+
+        function stopDetection() {
+            fetch('/api/stop_detection', { method: 'POST' })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        isDetecting = false;
+                        showNotification('Mood detection stopped', 'info');
+                        document.getElementById('detectionStatus').textContent = 'Inactive';
+                    }
+                });
+        }
+
+        function updateMoodDisplay() {
+            if (!isDetecting) return;
+
+            fetch('/api/current_mood')
+                .then(response => response.json())
+                .then(data => {
+                    const mood = data.stable_mood || 'neutral';
+                    const confidence = (data.current_mood.confidence * 100).toFixed(1);
+                    
+                    document.getElementById('currentMood').textContent = mood;
+                    document.getElementById('moodConfidence').textContent = confidence + '%';
+                    document.getElementById('confidenceFill').style.width = confidence + '%';
+                    
+                    const moodDisplay = document.getElementById('moodDisplay');
+                    moodDisplay.textContent = moodEmojis[mood] || '😐';
+                    moodDisplay.className = 'mood-display ' + mood;
+                    
+                    // Enhanced visual feedback based on confidence
+                    if (data.current_mood.confidence > 0.6) {
+                        moodDisplay.classList.add('pulse');
+                        moodDisplay.style.transform = 'scale(1.1)';
+                    } else if (data.current_mood.confidence > 0.3) {
+                        moodDisplay.classList.remove('pulse');
+                        moodDisplay.style.transform = 'scale(1.05)';
+                    } else {
+                        moodDisplay.classList.remove('pulse');
+                        moodDisplay.style.transform = 'scale(1.0)';
+                    }
+
+                    // Update current mood song count
+                    fetch(`/api/songs_by_mood/${mood}`)
+                        .then(response => response.json())
+                        .then(songData => {
+                            document.getElementById('currentMoodSongs').textContent = songData.songs.length;
+                        })
+                        .catch(error => console.error('Error getting mood songs:', error));
+                })
+                .catch(error => console.error('Error updating mood:', error));
+        }
+
+        function playMoodMusic(mood) {
+            fetch(`/api/play_mood/${mood}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        showNotification(`Playing ${mood} music`, 'success');
+                        // Highlight selected mood
+                        document.querySelectorAll('.mood-btn').forEach(btn => btn.classList.remove('active'));
+                        event.target.closest('.mood-btn').classList.add('active');
+                    } else {
+                        showNotification('No songs found for ' + mood, 'warning');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    showNotification('Error playing music', 'error');
+                });
+        }
+
+        function musicControl(action) {
+            fetch(`/api/music_control/${action}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        updatePlaybackStatus();
+                    }
+                })
+                .catch(error => console.error('Error:', error));
+        }
+
+        function togglePlayPause() {
+            const btn = document.getElementById('playPauseBtn');
+            const isPlaying = currentPlaybackStatus.is_playing && !currentPlaybackStatus.is_paused;
+            
+            if (isPlaying) {
+                musicControl('pause');
+            } else {
+                musicControl('resume');
+            }
+        }
+
+        function setVolume(volume) {
+            fetch('/api/set_volume', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ volume: volume / 100 })
+            })
+            .then(response => response.json())
+            .catch(error => console.error('Error:', error));
+        }
+
+        function updatePlaybackStatus() {
+            fetch('/api/playback_status')
+                .then(response => response.json())
+                .then(data => {
+                    currentPlaybackStatus = data;
+                    
+                    // Update play/pause button
+                    const playPauseBtn = document.getElementById('playPauseBtn');
+                    const isPlaying = data.is_playing && !data.is_paused;
+                    playPauseBtn.innerHTML = isPlaying ? 
+                        '<i class="fas fa-pause"></i>' : '<i class="fas fa-play"></i>';
+                    
+                    // Update current song display
+                    const currentSong = document.getElementById('currentSong');
+                    if (data.current_song) {
+                        currentSong.innerHTML = `
+                            <div class="song-title">${data.current_song.title}</div>
+                            <div class="song-artist">${data.current_song.artist}</div>
+                        `;
+                    } else {
+                        currentSong.innerHTML = `
+                            <div class="song-title">No song playing</div>
+                            <div class="song-artist">Select a mood or start detection</div>
+                        `;
+                    }
+                    
+                    // Update shuffle/repeat buttons
+                    const shuffleBtn = document.getElementById('shuffleBtn');
+                    const repeatBtn = document.getElementById('repeatBtn');
+                    
+                    if (data.shuffle) shuffleBtn.classList.add('active');
+                    else shuffleBtn.classList.remove('active');
+                    
+                    if (data.repeat) repeatBtn.classList.add('active');
+                    else repeatBtn.classList.remove('active');
+                    
+                    // Update volume slider
+                    document.getElementById('volumeSlider').value = data.volume * 100;
+                })
+                .catch(error => console.error('Error updating status:', error));
+        }
+
+        function updateLibraryStats() {
+            fetch('/api/library_stats')
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('songsCount').textContent = data.total || 0;
+                    
+                    const libraryStats = document.getElementById('libraryStats');
+                    libraryStats.innerHTML = '';
+                    
+                    Object.entries(data).forEach(([mood, count]) => {
+                        if (mood !== 'total') {
+                            const statItem = document.createElement('div');
+                            statItem.className = 'status-item';
+                            statItem.innerHTML = `
+                                <span class="status-value">${count}</span>
+                                <span class="status-label">${mood}</span>
+                            `;
+                            libraryStats.appendChild(statItem);
+                        }
+                    });
+                })
+                .catch(error => console.error('Error updating library stats:', error));
+        }
+
+        function toggleAutoPlay() {
+            fetch('/api/toggle_auto_play', { method: 'POST' })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        autoPlayEnabled = data.auto_play_enabled;
+                        const btn = document.getElementById('autoPlayBtn');
+                        btn.innerHTML = `<i class="fas fa-magic"></i> Auto Play: ${autoPlayEnabled ? 'ON' : 'OFF'}`;
+                        btn.classList.toggle('active', autoPlayEnabled);
+                    }
+                })
+                .catch(error => console.error('Error:', error));
+        }
+
+        function refreshLibrary() {
+            const btn = event.target;
+            btn.innerHTML = '<div class="loading"></div> Refreshing...';
+            btn.disabled = true;
+
+            fetch('/api/refresh_library', { method: 'POST' })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        showNotification('Library refreshed!', 'success');
+                        updateLibraryStats();
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    showNotification('Error refreshing library', 'error');
+                })
+                .finally(() => {
+                    btn.innerHTML = '<i class="fas fa-sync-alt"></i> Refresh Library';
+                    btn.disabled = false;
+                });
+        }
+
+        function trainClassifier() {
+            const btn = event.target;
+            btn.innerHTML = '<div class="loading"></div> Training...';
+            btn.disabled = true;
+
+            fetch('/api/train_classifier', { method: 'POST' })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        showNotification('AI classifier trained successfully!', 'success');
+                    } else {
+                        showNotification('Training failed: ' + data.message, 'error');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    showNotification('Error training classifier', 'error');
+                })
+                .finally(() => {
+                    btn.innerHTML = '<i class="fas fa-brain"></i> Train AI';
+                    btn.disabled = false;
+                });
+        }
+
+        function showNotification(message, type = 'info') {
+            const notification = document.getElementById('notification');
+            notification.textContent = message;
+            notification.className = 'notification show';
+            
+            setTimeout(() => {
+                notification.classList.remove('show');
+            }, 3000);
+        }
+
+        function updateDetectionParams() {
+            const sensitivity = document.getElementById('sensitivitySlider').value;
+            const smoothing = document.getElementById('smoothingSlider').value;
+            const responseTime = document.getElementById('responseSlider').value;
+            
+            // Update display values
+            document.getElementById('sensitivityValue').textContent = parseFloat(sensitivity).toFixed(2);
+            document.getElementById('smoothingValue').textContent = parseFloat(smoothing).toFixed(2);
+            document.getElementById('responseValue').textContent = responseTime;
+            
+            // Send to backend
+            fetch('/api/set_detection_params', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    confidence_threshold: parseFloat(sensitivity),
+                    emotion_smoothing: parseFloat(smoothing),
+                    mood_change_cooldown: parseInt(responseTime),
+                    mood_stability_window: parseInt(responseTime) + 4
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showNotification('Detection settings updated', 'success');
+                }
+            })
+            .catch(error => console.error('Error updating detection params:', error));
+        }
+
+        function updateSadSensitivity() {
+            const sadSensitivity = document.getElementById('sadSensitivitySlider').value;
+            
+            // Update display value
+            document.getElementById('sadSensitivityValue').textContent = parseFloat(sadSensitivity).toFixed(1);
+            
+            // Send to backend
+            fetch('/api/set_sad_sensitivity', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    sensitivity: parseFloat(sadSensitivity)
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showNotification(`Sad detection sensitivity: ${data.sensitivity}x`, 'success');
+                }
+            })
+            .catch(error => console.error('Error updating sad sensitivity:', error));
+        }
+
+        function showDebugInfo() {
+            fetch('/api/detection_debug')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    const info = data.debug_info;
+                    const msg = `Debug Info:\n` +
+                               `Sad Threshold: ${info.emotion_thresholds.sad.toFixed(3)}\n` +
+                               `Sad Intensity: ${info.emotion_intensity.sad.toFixed(3)}\n` +
+                               `Current Mood: ${data.current_mood.mood} (${data.current_mood.confidence.toFixed(3)})`;
+                    alert(msg);
+                }
+            })
+            .catch(error => console.error('Error getting debug info:', error));
+        }
+
+        function resetDetectionDefaults() {
+            document.getElementById('sensitivitySlider').value = 0.20;
+            document.getElementById('smoothingSlider').value = 0.6;
+            document.getElementById('responseSlider').value = 8;
+            document.getElementById('sadSensitivitySlider').value = 1.2;
+            
+            // Update displays
+            document.getElementById('sensitivityValue').textContent = '0.20';
+            document.getElementById('smoothingValue').textContent = '0.60';
+            document.getElementById('responseValue').textContent = '8';
+            document.getElementById('sadSensitivityValue').textContent = '1.2';
+            
+            updateDetectionParams();
+            updateSadSensitivity();
+            showNotification('Reset to optimized defaults for sad detection', 'success');
+        }
+    </script>
+</body>
+</html>
