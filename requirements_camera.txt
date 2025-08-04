@@ -1,0 +1,14 @@
+# Hybrid requirements - supports both camera and demo modes
+flask==3.0.0
+gunicorn==21.2.0
+
+# Camera and ML dependencies (optional)
+opencv-python==4.8.1.78
+numpy==1.24.3
+fer==22.5.1
+tensorflow==2.15.0
+mtcnn==0.1.1
+
+# Basic utilities
+Pillow==10.0.1
+requests==2.31.0
