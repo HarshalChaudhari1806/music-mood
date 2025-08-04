@@ -1,275 +1,337 @@
-"""
-Lightweight Music Mood Player - Demo Version
-Optimized for fast deployment without heavy ML dependencies
-"""
-import os
+from flask import Flask, render_template, jsonify, request, redirect, url_for
+import threading
 import time
-import random
-from flask import Flask, render_template, jsonify, request
+import os
+from mood_detector import MoodDetector
+from music_manager import MusicManager
+from music_analyzer import MusicAnalyzer
 import logging
 
-# Configure logging
+app = Flask(__name__)
+app.secret_key = 'music_mood_secret_key_2024'
+
+# Initialize components
+mood_detector = MoodDetector()
+music_manager = MusicManager()
+music_analyzer = MusicAnalyzer()
+
+# Global state
+app_state = {
+    'mood_detection_active': False,
+    'auto_play_enabled': True,
+    'last_mood_change': time.time(),
+    'mood_change_cooldown': 8,  # Reduced cooldown for better responsiveness
+    'mood_stability_window': 12  # Shorter window for more responsive mood changes
+}
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-app = Flask(__name__)
-
-# Demo data for mood simulation
-MOODS = ['happy', 'sad', 'angry', 'surprise', 'fear', 'neutral', 'disgust']
-MOOD_EMOJIS = {
-    'happy': '😊',
-    'sad': '😢', 
-    'angry': '😠',
-    'surprise': '😲',
-    'fear': '😨',
-    'neutral': '😐',
-    'disgust': '🤢'
-}
-
-# Global state for demo
-current_mood_state = {
-    'mood': 'neutral',
-    'confidence': 0.8,
-    'timestamp': time.time()
-}
-
-detection_active = False
-demo_songs = {
-    'happy': ['Sunshine Vibes', 'Happy Days', 'Feel Good Song'],
-    'sad': ['Melancholy Blues', 'Tears in Rain', 'Lonely Heart'],
-    'angry': ['Rage Storm', 'Fire Inside', 'Break the Walls'],
-    'surprise': ['Unexpected Joy', 'Wow Moment', 'Amazing Grace'],
-    'fear': ['Dark Shadows', 'Tension Rising', 'Heart Racing'],
-    'neutral': ['Calm Waters', 'Peaceful Mind', 'Steady Beat'],
-    'disgust': ['Bitter Truth', 'Sour Notes', 'Distaste']
-}
-
 @app.route('/')
 def index():
-    """Main page - serves the demo template"""
-    return render_template('demo.html')
-
-@app.route('/full')
-def full_app():
-    """Full app page - shows what the complete app looks like"""
+    """Main application page"""
     return render_template('index.html')
-
-@app.route('/api/health')
-def health_check():
-    """Health check endpoint"""
-    return jsonify({
-        'status': 'healthy',
-        'version': 'demo',
-        'mode': 'lightweight',
-        'timestamp': time.time()
-    })
-
-@app.route('/api/demo')
-def demo_info():
-    """Demo information"""
-    return jsonify({
-        'title': 'Music Mood Player - Demo',
-        'description': 'AI-powered emotion detection and music recommendation system',
-        'features': [
-            'Real-time facial emotion detection',
-            'Advanced machine learning mood classification', 
-            'Adaptive music selection based on emotions',
-            'Enhanced sad emotion sensitivity',
-            'Customizable detection parameters'
-        ],
-        'deployment': {
-            'platforms': ['Railway', 'Render', 'Fly.io', 'Heroku'],
-            'demo_mode': True,
-            'full_version_available': True
-        }
-    })
 
 @app.route('/api/start_detection', methods=['POST'])
 def start_detection():
-    """Start demo mood detection"""
-    global detection_active
-    detection_active = True
-    logger.info("Demo detection started")
-    return jsonify({
-        'success': True,
-        'message': 'Demo mood detection started',
-        'mode': 'simulation'
-    })
+    """Start mood detection"""
+    try:
+        if mood_detector.start_detection():
+            app_state['mood_detection_active'] = True
+            
+            # Start mood monitoring thread
+            monitor_thread = threading.Thread(target=mood_monitor_loop, daemon=True)
+            monitor_thread.start()
+            
+            return jsonify({'success': True, 'message': 'Mood detection started'})
+        else:
+            return jsonify({'success': False, 'message': 'Failed to start camera'})
+    
+    except Exception as e:
+        logger.error(f"Error starting detection: {e}")
+        return jsonify({'success': False, 'message': str(e)})
 
-@app.route('/api/stop_detection', methods=['POST']) 
+@app.route('/api/stop_detection', methods=['POST'])
 def stop_detection():
-    """Stop demo mood detection"""
-    global detection_active
-    detection_active = False
-    logger.info("Demo detection stopped")
-    return jsonify({
-        'success': True,
-        'message': 'Demo detection stopped'
-    })
+    """Stop mood detection"""
+    try:
+        mood_detector.stop_detection()
+        app_state['mood_detection_active'] = False
+        return jsonify({'success': True, 'message': 'Mood detection stopped'})
+    
+    except Exception as e:
+        logger.error(f"Error stopping detection: {e}")
+        return jsonify({'success': False, 'message': str(e)})
 
 @app.route('/api/current_mood')
 def get_current_mood():
-    """Get current mood - simulated or set"""
-    global current_mood_state
-    
-    # If detection is active, occasionally change mood randomly
-    if detection_active and random.random() < 0.3:  # 30% chance
-        new_mood = random.choice(MOODS)
-        current_mood_state = {
-            'mood': new_mood,
-            'confidence': round(random.uniform(0.6, 0.95), 2),
-            'timestamp': time.time()
-        }
-    
-    return jsonify(current_mood_state)
-
-@app.route('/api/demo_mood/<mood>')
-def set_demo_mood(mood):
-    """Set specific mood for demo"""
-    global current_mood_state
-    
-    if mood in MOODS:
-        current_mood_state = {
-            'mood': mood,
-            'confidence': round(random.uniform(0.7, 0.95), 2),
-            'timestamp': time.time()
-        }
-        logger.info(f"Demo mood set to: {mood}")
+    """Get current detected mood"""
+    try:
+        mood_data = mood_detector.get_current_mood()
+        stable_mood = mood_detector.get_stable_mood()
+        
         return jsonify({
-            'success': True,
-            'mood': mood,
-            'confidence': current_mood_state['confidence'],
-            'emoji': MOOD_EMOJIS.get(mood, '😐')
+            'current_mood': mood_data,
+            'stable_mood': stable_mood,
+            'detection_active': app_state['mood_detection_active']
         })
     
-    return jsonify({'success': False, 'message': 'Invalid mood'})
-
-@app.route('/api/songs_by_mood/<mood>')
-def get_songs_by_mood(mood):
-    """Get demo songs for a mood"""
-    songs = demo_songs.get(mood, demo_songs['neutral'])
-    return jsonify({
-        'mood': mood,
-        'songs': [{'title': song, 'artist': 'Demo Artist'} for song in songs],
-        'count': len(songs)
-    })
-
-@app.route('/api/library_stats')
-def get_library_stats():
-    """Get demo library statistics"""
-    total_songs = sum(len(songs) for songs in demo_songs.values())
-    return jsonify({
-        'total_songs': total_songs,
-        'mood_counts': {mood: len(songs) for mood, songs in demo_songs.items()},
-        'demo_mode': True
-    })
-
-@app.route('/api/playback_status')
-def get_playback_status():
-    """Get demo playback status"""
-    mood = current_mood_state['mood']
-    current_song = random.choice(demo_songs.get(mood, demo_songs['neutral']))
-    
-    return jsonify({
-        'is_playing': detection_active,
-        'current_song': {
-            'title': current_song,
-            'artist': 'Demo Artist',
-            'mood': mood
-        },
-        'position': random.randint(30, 180),  # Random position
-        'volume': 70,
-        'demo_mode': True
-    })
-
-@app.route('/api/mood_stats')
-def get_mood_stats():
+    except Exception as e:
+        logger.error(f"Error getting mood: {e}")
+        return jsonify({'error': str(e)})
+@app.route('/api/mood_statistics')
+def get_mood_statistics():
     """Get mood detection statistics"""
-    return jsonify({
-        'session_duration': time.time() - app.start_time if hasattr(app, 'start_time') else 0,
-        'total_detections': random.randint(50, 200),
-        'mood_distribution': {
-            'happy': random.randint(10, 30),
-            'sad': random.randint(5, 15), 
-            'neutral': random.randint(20, 40),
-            'angry': random.randint(2, 8),
-            'surprise': random.randint(3, 10),
-            'fear': random.randint(1, 5),
-            'disgust': random.randint(1, 3)
-        },
-        'average_confidence': round(random.uniform(0.75, 0.90), 2),
-        'demo_mode': True
-    })
+    try:
+        stats = mood_detector.get_mood_statistics()
+        return jsonify(stats)
+    
+    except Exception as e:
+        logger.error(f"Error getting mood statistics: {e}")
+        return jsonify({'error': str(e)})
 
 @app.route('/api/set_detection_params', methods=['POST'])
 def set_detection_params():
-    """Demo endpoint for detection parameters"""
-    data = request.get_json()
-    logger.info(f"Demo: Detection params updated: {data}")
-    return jsonify({
-        'success': True,
-        'message': 'Demo parameters updated',
-        'params': data
-    })
+    """Set mood detection parameters for fine-tuning"""
+    try:
+        data = request.get_json()
+        
+        if 'confidence_threshold' in data:
+            mood_detector.confidence_threshold = float(data['confidence_threshold'])
+        
+        if 'emotion_smoothing' in data:
+            mood_detector.emotion_smoothing = float(data['emotion_smoothing'])
+        
+        if 'mood_change_cooldown' in data:
+            app_state['mood_change_cooldown'] = int(data['mood_change_cooldown'])
+        
+        if 'mood_stability_window' in data:
+            app_state['mood_stability_window'] = int(data['mood_stability_window'])
+        
+        return jsonify({
+            'success': True,
+            'message': 'Detection parameters updated',
+            'current_params': {
+                'confidence_threshold': mood_detector.confidence_threshold,
+                'emotion_smoothing': mood_detector.emotion_smoothing,
+                'mood_change_cooldown': app_state['mood_change_cooldown'],
+                'mood_stability_window': app_state['mood_stability_window']
+            }
+        })
+    
+    except Exception as e:
+        logger.error(f"Error setting detection params: {e}")
+        return jsonify({'success': False, 'message': str(e)})
 
 @app.route('/api/set_sad_sensitivity', methods=['POST'])
 def set_sad_sensitivity():
-    """Demo endpoint for sad sensitivity"""
-    data = request.get_json()
-    sensitivity = data.get('sensitivity', 1.0)
-    logger.info(f"Demo: Sad sensitivity set to {sensitivity}")
-    return jsonify({
-        'success': True,
-        'sensitivity': sensitivity,
-        'message': f'Demo sad sensitivity: {sensitivity}x'
-    })
+    """Set sad emotion detection sensitivity"""
+    try:
+        data = request.get_json()
+        sensitivity = float(data.get('sensitivity', 1.0))
+        
+        # Clamp sensitivity between 0.5 and 3.0
+        sensitivity = max(0.5, min(3.0, sensitivity))
+        
+        mood_detector.update_sad_sensitivity(sensitivity)
+        
+        return jsonify({
+            'success': True,
+            'sensitivity': sensitivity,
+            'debug_info': mood_detector.get_detection_debug_info()
+        })
+    
+    except Exception as e:
+        logger.error(f"Error setting sad sensitivity: {e}")
+        return jsonify({'success': False, 'message': str(e)})
 
 @app.route('/api/detection_debug')
 def get_detection_debug():
-    """Demo debug information"""
-    return jsonify({
-        'success': True,
-        'debug_info': {
-            'confidence_threshold': 0.20,
-            'emotion_thresholds': {
-                'sad': 0.15,
-                'happy': 0.25,
-                'angry': 0.30,
-                'neutral': 0.20
-            },
-            'emotion_intensity': {
-                'sad': 1.2,
-                'happy': 1.0,
-                'angry': 1.0,
-                'neutral': 0.5
-            },
-            'demo_mode': True
-        },
-        'current_mood': current_mood_state
-    })
+    """Get debug information about detection parameters"""
+    try:
+        return jsonify({
+            'success': True,
+            'debug_info': mood_detector.get_detection_debug_info(),
+            'current_mood': mood_detector.get_current_mood()
+        })
+    
+    except Exception as e:
+        logger.error(f"Error getting debug info: {e}")
+        return jsonify({'success': False, 'message': str(e)})
 
-# Error handlers
-@app.errorhandler(404)
-def not_found(error):
-    return jsonify({'error': 'Page not found', 'demo_mode': True}), 404
+@app.route('/api/play_mood/<mood>')
+def play_mood_music(mood):
+    """Play music for a specific mood"""
+    try:
+        music_manager.play_mood_music(mood)
+        return jsonify({'success': True, 'message': f'Playing {mood} music'})
+    
+    except Exception as e:
+        logger.error(f"Error playing mood music: {e}")
+        return jsonify({'success': False, 'message': str(e)})
 
-@app.errorhandler(500)
-def internal_error(error):
-    return jsonify({'error': 'Internal server error', 'demo_mode': True}), 500
+@app.route('/api/music_control/<action>')
+def music_control(action):
+    """Control music playback"""
+    try:
+        if action == 'pause':
+            music_manager.pause()
+        elif action == 'resume':
+            music_manager.resume()
+        elif action == 'stop':
+            music_manager.stop()
+        elif action == 'next':
+            music_manager.next_song()
+        elif action == 'previous':
+            music_manager.previous_song()
+        elif action == 'shuffle':
+            music_manager.toggle_shuffle()
+        elif action == 'repeat':
+            music_manager.toggle_repeat()
+        else:
+            return jsonify({'success': False, 'message': 'Invalid action'})
+        
+        return jsonify({'success': True, 'message': f'Action {action} completed'})
+    
+    except Exception as e:
+        logger.error(f"Error with music control: {e}")
+        return jsonify({'success': False, 'message': str(e)})
+
+@app.route('/api/set_volume', methods=['POST'])
+def set_volume():
+    """Set music volume"""
+    try:
+        data = request.get_json()
+        volume = float(data.get('volume', 0.7))
+        music_manager.set_volume(volume)
+        return jsonify({'success': True, 'volume': volume})
+    
+    except Exception as e:
+        logger.error(f"Error setting volume: {e}")
+        return jsonify({'success': False, 'message': str(e)})
+
+@app.route('/api/playback_status')
+def get_playback_status():
+    """Get current playback status"""
+    try:
+        status = music_manager.get_playback_status()
+        return jsonify(status)
+    
+    except Exception as e:
+        logger.error(f"Error getting playback status: {e}")
+        return jsonify({'error': str(e)})
+
+@app.route('/api/library_stats')
+def get_library_stats():
+    """Get music library statistics"""
+    try:
+        stats = music_manager.get_library_stats()
+        return jsonify(stats)
+    
+    except Exception as e:
+        logger.error(f"Error getting library stats: {e}")
+        return jsonify({'error': str(e)})
+
+@app.route('/api/songs_by_mood/<mood>')
+def get_songs_by_mood(mood):
+    """Get all songs for a specific mood"""
+    try:
+        songs = music_manager.get_songs_by_mood(mood)
+        return jsonify({'mood': mood, 'songs': songs})
+    
+    except Exception as e:
+        logger.error(f"Error getting songs by mood: {e}")
+        return jsonify({'error': str(e)})
+
+@app.route('/api/toggle_auto_play', methods=['POST'])
+def toggle_auto_play():
+    """Toggle automatic mood-based music playing"""
+    try:
+        app_state['auto_play_enabled'] = not app_state['auto_play_enabled']
+        return jsonify({
+            'success': True, 
+            'auto_play_enabled': app_state['auto_play_enabled']
+        })
+    
+    except Exception as e:
+        logger.error(f"Error toggling auto play: {e}")
+        return jsonify({'success': False, 'message': str(e)})
+
+@app.route('/api/refresh_library', methods=['POST'])
+def refresh_library():
+    """Refresh the music library"""
+    try:
+        music_manager.refresh_library()
+        return jsonify({'success': True, 'message': 'Music library refreshed'})
+    
+    except Exception as e:
+        logger.error(f"Error refreshing library: {e}")
+        return jsonify({'success': False, 'message': str(e)})
+
+@app.route('/api/train_classifier', methods=['POST'])
+def train_classifier():
+    """Train the music mood classifier"""
+    try:
+        success = music_analyzer.train_classifier('music')
+        if success:
+            return jsonify({'success': True, 'message': 'Classifier trained successfully'})
+        else:
+            return jsonify({'success': False, 'message': 'Failed to train classifier'})
+    
+    except Exception as e:
+        logger.error(f"Error training classifier: {e}")
+        return jsonify({'success': False, 'message': str(e)})
+def mood_monitor_loop():
+    """Background thread to monitor mood changes and play appropriate music"""
+    logger.info("Enhanced mood monitoring started")
+    
+    while app_state['mood_detection_active']:
+        try:
+            if app_state['auto_play_enabled']:
+                # Use enhanced stable mood detection
+                stable_mood = mood_detector.get_stable_mood(window_seconds=app_state['mood_stability_window'])
+                current_time = time.time()
+                
+                # Get current mood data for additional analysis
+                current_mood_data = mood_detector.get_current_mood()
+                
+                # Check if enough time has passed since last mood change
+                if (current_time - app_state['last_mood_change']) > app_state['mood_change_cooldown']:
+                    
+                    # Enhanced mood change logic
+                    should_change_mood = False
+                    
+                    if stable_mood != music_manager.current_mood:
+                        # Check confidence for mood change
+                        if current_mood_data['confidence'] > 0.4:
+                            should_change_mood = True
+                        elif stable_mood in ['happy', 'sad', 'angry'] and current_mood_data['confidence'] > 0.3:
+                            # Lower threshold for strong emotions
+                            should_change_mood = True
+                    
+                    if should_change_mood:
+                        logger.info(f"Enhanced mood change: {music_manager.current_mood} → {stable_mood} (confidence: {current_mood_data['confidence']:.2f})")
+                        music_manager.play_mood_music(stable_mood)
+                        app_state['last_mood_change'] = current_time
+            
+        except Exception as e:
+            logger.error(f"Error in enhanced mood monitor loop: {e}")
+        
+        time.sleep(1.5)  # Faster checking for better responsiveness
+    
+    logger.info("Enhanced mood monitoring stopped")
+    logger.info("Mood monitoring stopped")
 
 if __name__ == '__main__':
-    # Set start time for statistics
-    app.start_time = time.time()
+    # Create music directories if they don't exist
+    music_dirs = ['music/happy', 'music/sad', 'music/angry', 'music/neutral', 
+                  'music/fear', 'music/surprise', 'music/disgust']
     
-    # Get port and host from environment
-    port = int(os.environ.get('PORT', 5000))
-    host = os.environ.get('HOST', '0.0.0.0')
+    for dir_path in music_dirs:
+        os.makedirs(dir_path, exist_ok=True)
     
-    logger.info("🎵 Music Mood Player - Demo Version 🎵")
-    logger.info("=====================================")
-    logger.info("🚀 Lightweight deployment version")
-    logger.info("📱 Full camera features in local version")
-    logger.info(f"🌐 Starting on {host}:{port}")
+    logger.info("Music Mood Player starting...")
+    logger.info("Add your music files to the appropriate mood folders in the 'music' directory")
+    logger.info("Application will be available at http://localhost:5000")
     
-    # Run the app
-    app.run(host=host, port=port, debug=False)
+    app.run(debug=True, host='0.0.0.0', port=5000, threaded=True)
